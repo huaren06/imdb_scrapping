@@ -1,0 +1,119 @@
+---
+title: "Tutorial10++"
+author: "Huaren"
+date: "11/4/2019"
+output: html_document
+---
+
+First we go to www.imdb.com and scrape the necessary data and make a data frame and then save it as a csv.
+```{r}
+#Loading the rvest package
+library(rvest)
+
+pages = 100
+
+title_data <- vector()
+gross_data <- vector()
+votes_data <- vector()
+runtime_data <- vector()
+year_data <- vector()
+rating_data <- vector()
+metascore_data <- vector()
+genre_data <- vector()
+
+##WARNING##
+#this code takes approximately 15-20mins to finish scraping off the web#
+
+for(i in 1:pages) {
+  url <- paste0('https://www.imdb.com/list/ls057823854/?st_dt=&mode=detail&page=',i,'&ref_=ttls_vm_dtl&sort=list_order,asc')
+  webpage <- read_html(url)
+  title_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.lister-item-header a')
+  title_data <- c(title_data, html_text(title_data_html))
+  gross_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.text-muted .ghost~ .text-muted+ span')
+  gross_data <- c(gross_data, html_text(gross_data_html))
+  votes_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.text-muted+ span:nth-child(2)')
+  votes_data <- c(votes_data, html_text(votes_data_html))
+  runtime_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.runtime')
+  runtime_data <- c(runtime_data, html_text(runtime_data_html))
+  year_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.text-muted.unbold')
+  year_data <- c(year_data, html_text(year_data_html))
+  rating_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.ipl-rating-star.small .ipl-rating-star__rating')
+  rating_data <- c(rating_data, html_text(rating_data_html))
+  metascore_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.metascore')
+  metascore_data <- c(metascore_data, html_text(metascore_data_html))
+  genre_data_html <- html_node(html_nodes(webpage, '.lister-item-content'), '.genre')
+  genre_data <- c(genre_data, html_text(genre_data_html))
+  print(paste("web scraping is", i, "/100 pages complete"))
+}
+
+movies_df <- data.frame(Title = title_data, Year = year_data,
+                        Runtime = runtime_data, Genre = genre_data,
+                        Ratings = rating_data,
+                        Metascore = metascore_data,
+                        Gross_Earning_in_Mil = gross_data,
+                        Votes = votes_data)
+
+write.csv(movies_df,"USmovies.csv")
+#Yay! The data is now stored in movies_df and in the csv file named USmovies.csv
+movies_df <- read_csv("~/Desktop/Y2S1/DSA2101/Tutorials/Tutorial 10 ++/USmovies.csv")
+```
+
+```{r}
+movies_df$Gross_Earning_in_Mil <- as.numeric(substring(movies_df$Gross_Earning_in_Mil, 2, nchar(movies_df$Gross_Earning_in_Mil) - 1)) * 1000000
+movies_df$Runtime <- as.numeric(substring(movies_df$Runtime, 0, nchar(movies_df$Runtime) - 4))
+```
+
+
+```{r}
+#Here we are making a very very bold assumption, where the first genre is the main genre.
+#Now we can investigate which genre generates the greatest earnings
+data1 <- movies_df %>% select(Title, Genre, Gross_Earning_in_Mil, Ratings, Runtime)
+data2 <- data1 %>% mutate(MainGenre = gsub(",.*$", "", data1$Genre))
+
+p1 <- ggplot() +
+  geom_boxplot(data = data2, aes(x = MainGenre, y = Gross_Earning_in_Mil)) +
+  ggtitle("Gross Earnings against Main Genre")
+```
+
+```{r}
+#Here we plot a scatterplot to show the gross earnings against the ratings given by viewers. Suprinsingly, some movies can have ratings as low as 7 and yet have gross earnings of almost $600 million. 
+p2 <- ggplot() + 
+  geom_point(data = data2, aes(x = Ratings, y = Gross_Earning_in_Mil, colour = MainGenre, size = Runtime), alpha = 0.5) +
+  geom_smooth(data = data2, method = "loess", aes(x = Ratings, y = Gross_Earning_in_Mil)) +
+  geom_hline(yintercept = mean(data2$Gross_Earning_in_Mil, na.rm = TRUE), lty = 2) +
+  ggtitle("Gross Earnings against Ratings")
+
+```
+
+```{r}
+#movies with runtime slightly less than 100mins are normally rated very low as comapred to the rest.
+p3 <- ggplot() + 
+  geom_point(data = movies_df, aes(x = Runtime, y = Ratings), alpha = 0.3) +
+  geom_smooth(data = movies_df, aes(x = Runtime, y = Ratings), method = "loess") +
+  ggtitle("Ratings against runtime")
+```
+
+```{r}
+#Metascore and ratings are proportional.
+p4 <- ggplot() + 
+  geom_point(data = movies_df, aes(x = Metascore, y = Ratings), alpha = 0.3) +
+  geom_smooth(data = movies_df, aes(x = Metascore, y = Ratings), method = "loess") +
+  ggtitle("Relationship between metascore and ratings")
+```
+
+```{r}
+grid.arrange(p1,p2,p3,p4)
+#print any graph to view graph clearer
+```
+
+```{r}
+tutdata <- readRDS("~/Desktop/Y2S1/DSA2101/data/box_office_data.rds")
+scrappeddata <- read_csv("~/Desktop/Y2S1/DSA2101/Tutorials/Tutorial 10 ++/USmovies.csv")
+names(tutdata)[7] <- "Name"
+names(scrappeddata)[2] <- "Name"
+mergeddata <- merge(tutdata, scrappeddata, by = "Name")
+```
+
+
+
+
